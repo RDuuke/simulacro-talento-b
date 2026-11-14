@@ -41,6 +41,8 @@
   .table-title { margin:14px 0 4px; font-weight:700; }
   .git-input { display:block; width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; font:15px/1.5 monospace; }
   .hint { color:var(--muted); font-size:14px; margin:8px 0; }
+  .git-completion { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:12px; background:#f4f6fb; border-radius:8px; font:15px/1.5 monospace; }
+  .git-completion .git-input { width:140px; min-width:80px; }
   button:disabled { opacity:.6; cursor:not-allowed; }
   .setup { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin:20px 0; }
   .setup label { border:0; padding:0; cursor:default; font-weight:600; }
@@ -77,7 +79,6 @@
     <select id="difficulty"><option value="facil">Fácil</option><option value="medio">Medio</option><option value="dificil">Difícil</option></select>
     <p>El temporizador de práctica es de 30 minutos y no se puede pausar. Las preguntas son de práctica y no provienen de la prueba oficial. SQL se ejecuta en SQLite con datos de ejemplo; Git se compara con comandos admitidos, sin ejecutarlos. Una respuesta equivalente de Git podría requerir revisión manual.</p><div class="actions"><button type="button" onclick="startQuiz()">Comenzar simulacro</button></div>
   </div>
-  <datalist id="git-commands"><option value="git add "><option value="git status"><option value="git commit "><option value="git branch "><option value="git switch "><option value="git checkout "><option value="git log"><option value="git diff"><option value="git fetch "><option value="git pull"><option value="git push "><option value="git merge "><option value="git stash "><option value="git revert "><option value="git rebase "><option value="git cherry-pick "><option value="git reflog"><option value="git bisect "><option value="git restore "><option value="git remote "><option value="git show "></datalist>
   <div id="quiz"></div>
 
   <div class="actions" id="quizActions" hidden>
@@ -176,7 +177,8 @@ function buildQuiz(){
  for(const c of categories){
   const pool=(c==='SQL'||c==='Git'?practiceQuestions:questionBank).filter(x=>x.cat===c && x.level===level);
   const count=c==='Git'?4:c==='Testing'?2:1;
-  selected.push(...chooseQuestions(pool,count,level+':'+c));
+  if(c==='Git'){ selected.push(...chooseQuestions(pool.filter(q=>q.blank),2,level+':Git:blank')); selected.push(...chooseQuestions(pool.filter(q=>!q.blank),2,level+':Git:full')); }
+  else selected.push(...chooseQuestions(pool,count,level+':'+c));
  }
  window.currentQuiz=shuffle(selected);
  const container=document.getElementById('quiz');container.innerHTML='';
@@ -184,7 +186,8 @@ function buildQuiz(){
   const div=document.createElement('div'); div.className='question';
   let body='';
   if(item.type==='sql') body=`<div class="exercise-info"><strong>SQLite · Datos de práctica</strong><p class="hint">Activo: 1 = sí, 0 = no. El orden de las filas no afecta la calificación. Desliza las tablas horizontalmente si es necesario.</p>${sampleTables()}</div><label for="answer${i}">Escribe una consulta SELECT:</label><textarea id="answer${i}" spellcheck="false" placeholder="SELECT ..."></textarea><button class="secondary run" type="button" onclick="runSql(${i})">Ejecutar consulta</button><div class="output" id="output${i}" aria-live="polite"></div>`;
-  else if(item.type==='git') body=`<label for="answer${i}">Completa el comando de Git:</label><input class="git-input" id="answer${i}" type="text" value="git " list="git-commands" autocomplete="off" spellcheck="false" aria-describedby="git-hint${i}"><p class="hint" id="git-hint${i}">Escribe después de “git”. Puedes elegir una sugerencia y completar sus argumentos; también puedes escribir el comando completo.</p>`;
+  else if(item.type==='git' && item.blank) body=`<label for="answer${i}">Completa la parte que falta:</label><div class="git-completion"><span>git</span><input class="git-input" id="answer${i}" type="text" placeholder="..." autocomplete="off" spellcheck="false" aria-label="Parte que falta del comando Git"><span>${escapeHtml(item.gitSuffix)}</span></div><p class="hint">Escribe solo la parte que falta.</p>`;
+  else if(item.type==='git') body=`<label for="answer${i}">Escribe el comando completo:</label><input class="git-input" id="answer${i}" type="text" placeholder="git ..." autocomplete="off" spellcheck="false"><p class="hint">Incluye git y los argumentos necesarios.</p>`;
   else body=shuffle(item.o.map((text,index)=>({text,index}))).map(opt=>`<label><input type="radio" name="q${i}" value="${opt.index}">${escapeHtml(opt.text)}</label>`).join('');
   div.innerHTML=`<div class="qhead">Pregunta ${i+1} · ${escapeHtml(item.cat)}</div><div class="qtext">${escapeHtml(item.q)}</div>`+body;
   container.appendChild(div);
@@ -200,7 +203,7 @@ async function submitQuiz(){
    if(item.type){
     value=document.getElementById('answer'+i).value.trim();
     if(item.type==='git' && value.toLowerCase()==='git') value='';
-    if(value && item.type==='git')correct=item.answers.some(a=>normalizedGit(a)===normalizedGit(value));
+    if(value && item.type==='git'){const command=item.blank ? ['git',value,item.gitSuffix].filter(Boolean).join(' ') : value;correct=item.answers.some(a=>normalizedGit(a)===normalizedGit(command));}
     if(value && item.type==='sql'){const evaluation=await evaluateSql(value,item);correct=evaluation.correct;message=evaluation.message+' '+item.e}
    } else {const checked=document.querySelector(`input[name="q${i}"]:checked`);value=checked?checked.value:'';if(value!=='')correct=Number(value)===item.a}
    if(value!=='')answered++;if(correct)score++;

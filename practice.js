@@ -68,7 +68,7 @@ const gitRows = [
 ];
 const practiceQuestions = [
  ...sqlRows.map(([level,q,answer],i)=>({id:'sql'+i,level,cat:'SQL',q,answer,type:'sql',e:'Consulta de referencia: '+answer})),
- ...gitRows.map(([level,q,answers],i)=>({id:'git'+i,level,cat:'Git',q,answers,type:'git',e:'Ejemplo: '+answers[0]}))
+ ...gitRows.map(([level,q,answers],i)=>{ const parts=answers[0].split(' '); const blank=i % 2 === 1; return {id:'git'+i,level,cat:'Git',q,answers,type:'git',blank,gitSuffix:blank?parts.slice(2).join(' '):'',e:'Ejemplo: '+answers[0]}; })
 ];
 let sqlEnginePromise;
 function getSqlEngine(){
