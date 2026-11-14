@@ -28,6 +28,10 @@
   .ok { color:var(--ok); } .bad { color:var(--bad); }
   .feedback { margin-top:12px; padding:12px; border-radius:8px; background:#f8f9fb; }
   .timer { font-weight:700; }
+  .setup { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin:20px 0; }
+  .setup label { border:0; padding:0; cursor:default; font-weight:600; }
+  select { width:100%; max-width:320px; padding:12px; border:1px solid var(--border); border-radius:8px; font:inherit; background:white; }
+  [hidden] { display:none !important; }
   .question, .result { min-width:0; overflow-wrap:anywhere; }
   label { line-height:1.5; overflow-wrap:anywhere; }
   .actions button { max-width:100%; }
@@ -46,7 +50,7 @@
 <div class="container">
   <div class="header">
     <h1>Simulacro Talento B — Backend</h1>
-    <div class="subtitle">Práctica individual. Cada recarga genera un conjunto diferente de preguntas.</div>
+    <div class="subtitle">Elige la dificultad y practica con preguntas variadas de backend.</div>
     <div class="stats">
       <span class="pill">8 preguntas</span>
       <span class="pill">Problem Solving · SQL · Git · Testing</span>
@@ -54,11 +58,16 @@
     </div>
   </div>
 
+  <div class="setup" id="setup">
+    <label for="difficulty">Dificultad</label>
+    <select id="difficulty"><option value="facil">Fácil</option><option value="medio">Medio</option><option value="dificil">Difícil</option></select>
+    <div class="actions"><button type="button" onclick="startQuiz()">Comenzar simulacro</button></div>
+  </div>
   <div id="quiz"></div>
 
-  <div class="actions">
+  <div class="actions" id="quizActions" hidden>
     <button onclick="submitQuiz()">Finalizar y calificar</button>
-    <button class="secondary" onclick="location.reload()">Nuevo simulacro</button>
+    <button class="secondary" onclick="resetQuiz()">Nuevo simulacro</button>
   </div>
 
   <div id="result" class="result"></div>
@@ -100,20 +109,27 @@ const questionBank = [
   {cat:"Testing", q:"¿Cuál es el propósito principal de un mock en una prueba?", o:["Simular una dependencia para controlar su comportamiento","Aumentar la velocidad del servidor","Crear una base de datos de producción","Reemplazar todos los tests"], a:0, e:"Un mock permite simular y controlar una dependencia durante la prueba."}
 ];
 
+// Dificultad asignada a las preguntas originales.
+const originalLevels = ['facil','facil','medio','facil','medio','medio','medio','facil','facil','medio','medio','medio','medio','facil','dificil','facil','facil','medio','medio','facil'];
+questionBank.forEach((q, i) => q.level = originalLevels[i]);
+questionBank.push(...[["facil","Problem Solving","¿Cuántos elementos tiene el arreglo [3, 6, 9]?",["2","3","6","9"],1,"El arreglo contiene tres elementos."],["facil","Problem Solving","¿Qué valor devuelve 17 % 5?",["2","3","5","0"],0,"El residuo de dividir 17 entre 5 es 2."],["facil","Problem Solving","¿Qué estructura suele procesar el primer elemento insertado primero?",["Pila","Cola","Árbol","Conjunto"],1,"Una cola sigue el orden FIFO."],["facil","SQL","¿Qué instrucción consulta filas de una tabla?",["SELECT","DELETE","DROP","INSERT"],0,"SELECT recupera datos."],["facil","SQL","¿Qué cláusula filtra filas antes de agrupar?",["ORDER BY","WHERE","HAVING","LIMIT"],1,"WHERE filtra las filas de entrada."],["facil","SQL","¿Qué sentencia agrega una fila?",["UPDATE","INSERT INTO","DELETE","ALTER"],1,"INSERT INTO añade filas a una tabla."],["facil","Git","¿Qué comando copia un repositorio remoto?",["git clone","git init","git status","git diff"],0,"git clone crea una copia local del repositorio."],["facil","Git","¿Qué comando prepara un archivo para el próximo commit?",["git add archivo","git log archivo","git pull archivo","git branch archivo"],0,"git add agrega el contenido al área de preparación."],["facil","Git","¿Qué comando muestra el historial de commits?",["git log","git push","git stash","git init"],0,"git log muestra el historial de commits."],["facil","Testing","¿Qué compara una aserción en una prueba?",["El resultado obtenido con el esperado","El tamaño de dos servidores","La velocidad de Internet","Dos ramas de Git"],0,"Una aserción comprueba una condición esperada."],["facil","Testing","¿Para qué sirve una prueba de regresión?",["Detectar si un cambio rompió algo que funcionaba","Crear una rama","Ordenar una tabla","Reiniciar el servidor"],0,"Una prueba de regresión detecta comportamientos que dejaron de funcionar."],["facil","Testing","¿Cuál es un caso válido para probar una función que suma?",["Comprobar suma(2, 3) = 5","Comprobar que siempre devuelve texto","Eliminar el código","Probar solo el nombre"],0,"Se compara una salida concreta con el resultado esperado."],["medio","Problem Solving","¿Cuál es la complejidad de búsqueda binaria sobre un arreglo ordenado?",["O(n²)","O(n)","O(log n)","O(1)"],2,"Cada paso reduce aproximadamente a la mitad el espacio de búsqueda."],["medio","Problem Solving","¿Qué estructura permite comprobar pertenencia en tiempo promedio O(1) con hashing?",["Tabla hash","Lista enlazada","Pila","Cola"],0,"Una tabla hash ofrece búsqueda promedio constante bajo supuestos habituales."],["medio","Problem Solving","Para detectar paréntesis balanceados en una expresión, ¿qué estructura resulta apropiada?",["Cola","Pila","Matriz","Lista ordenada"],1,"La pila conserva el último paréntesis abierto para verificar su cierre."],["medio","SQL","¿Qué devuelve COUNT(columna) cuando hay valores NULL?",["Cuenta solo valores no NULL","Cuenta todas las filas","Cuenta solo NULL","Produce siempre un error"],0,"COUNT(columna) ignora los valores NULL."],["medio","SQL","¿Qué condición selecciona valores nulos?",["columna = NULL","columna IS NULL","columna == NULL","columna IN NULL"],1,"IS NULL es el predicado apropiado para detectar NULL."],["medio","SQL","¿Qué hace INNER JOIN?",["Devuelve coincidencias entre ambas tablas","Devuelve siempre todas las filas izquierdas","Borra duplicados de una tabla","Ordena por clave"],0,"INNER JOIN conserva las filas que satisfacen la condición de unión."],["medio","Git","¿Qué comando crea un nuevo commit que revierte otro commit?",["git revert","git reset --hard","git clean","git fetch"],0,"git revert registra la reversión en un nuevo commit."],["medio","Git","¿Qué muestra git diff --staged?",["Cambios preparados frente al último commit","Todos los archivos remotos","Solo ramas sin fusionar","Cambios de configuración global"],0,"Compara el área de preparación con HEAD."],["medio","Git","¿Para qué sirve un archivo .gitignore?",["Evitar que archivos no rastreados coincidentes se agreguen por defecto","Eliminar commits remotos","Cifrar credenciales","Ignorar automáticamente archivos ya rastreados"],0,"Las reglas afectan principalmente archivos no rastreados."],["medio","Testing","¿Qué prueba verifica la interacción entre una aplicación y una base de datos real de pruebas?",["Integración","Unitaria aislada","Análisis estático","Formato"],0,"Una prueba de integración comprueba la interacción entre componentes."],["medio","Testing","¿Qué significa que una prueba sea determinista?",["Con las mismas condiciones produce el mismo resultado","Siempre pasa aunque haya errores","Depende de la hora actual","Solo funciona en producción"],0,"Una prueba determinista produce resultados consistentes con las mismas condiciones."],["medio","Testing","¿Qué conviene comprobar al probar un endpoint que crea un recurso?",["Código de estado y datos persistidos","Solo el color de la página","Únicamente el nombre del test","La versión del navegador"],0,"Conviene validar la respuesta y el efecto observable esperado."],["dificil","Problem Solving","Un arreglo ordenado tiene n elementos. ¿Cuál es la complejidad de encontrar un par con suma objetivo mediante dos punteros?",["O(n)","O(n²)","O(log n)","O(1)"],0,"Los punteros avanzan como máximo un número lineal de posiciones."],["dificil","Problem Solving","¿Qué complejidad tiene recorrer todos los nodos y aristas de un grafo mediante BFS?",["O(V + E)","O(V × E)","O(log V)","O(V²) siempre"],0,"BFS visita cada vértice y procesa las aristas una cantidad constante de veces."],["dificil","Problem Solving","Para buscar la longitud de la subcadena sin caracteres repetidos, ¿qué técnica logra O(n) con una tabla de posiciones?",["Ventana deslizante","Ordenar todas las subcadenas","Búsqueda exhaustiva","Recursión sin memoria"],0,"La ventana deslizante mueve cada extremo como máximo O(n) veces."],["dificil","SQL","¿Qué efecto tiene un WHERE sobre una columna de la tabla derecha de un LEFT JOIN si exige un valor no nulo?",["Puede eliminar filas sin coincidencia","Preserva necesariamente todas las filas izquierdas","Convierte NULL en cero","Elimina la condición JOIN"],0,"Las filas sin coincidencia tienen NULL y pueden quedar excluidas por WHERE."],["dificil","SQL","¿Cuál es la diferencia habitual entre ROW_NUMBER y DENSE_RANK ante empates?",["ROW_NUMBER asigna números distintos; DENSE_RANK comparte rango sin huecos","Ambas siempre dan el mismo número","DENSE_RANK elimina filas","ROW_NUMBER agrupa filas"],0,"ROW_NUMBER numera filas; DENSE_RANK asigna el mismo rango a empates sin saltos."],["dificil","SQL","¿Qué propiedad de una transacción garantiza que todos sus cambios se aplican o ninguno?",["Atomicidad","Durabilidad","Aislamiento","Índice"],0,"La atomicidad trata la transacción como una unidad indivisible."],["dificil","Git","¿Qué comando aplica los cambios de un commit específico como un nuevo commit en la rama actual?",["git cherry-pick","git fetch","git branch","git bisect"],0,"git cherry-pick aplica el cambio seleccionado y crea un commit nuevo."],["dificil","Git","¿Para qué se usa git bisect?",["Localizar mediante búsqueda binaria el commit que introdujo un fallo","Fusionar todas las ramas","Recuperar contraseñas","Eliminar archivos ignorados"],0,"git bisect reduce progresivamente el rango entre revisiones buena y mala."],["dificil","Git","¿Qué alternativa reduce el riesgo al actualizar una rama remota reescrita frente a --force?",["git push --force-with-lease","git push --delete","git reset --hard","git clean -fd"],0,"--force-with-lease comprueba la referencia remota esperada antes de sobrescribirla."],["dificil","Testing","¿Qué situación puede provocar una prueba intermitente?",["Depender de tiempos de espera o recursos compartidos sin control","Usar datos fijos","Aislar dependencias","Comprobar un valor determinista"],0,"El tiempo y el estado compartido pueden producir resultados variables."],["dificil","Testing","¿Qué identifica una prueba de concurrencia sobre una actualización de saldo?",["Posibles condiciones de carrera y actualizaciones perdidas","Solo errores de ortografía","El color de la interfaz","La longitud de un nombre"],0,"Las operaciones simultáneas pueden revelar actualizaciones perdidas."],["dificil","Testing","¿Qué describe mejor una prueba basada en propiedades?",["Verifica invariantes para muchas entradas generadas","Prueba una sola entrada fija","Sustituye toda prueba de integración","Comprueba exclusivamente la cobertura"],0,"Una propiedad expresa un invariante que se verifica con diversas entradas."]].map(([level,cat,q,o,a,e]) => ({level,cat,q,o,a,e})));
+
 function shuffle(arr){
-  return [...arr].sort(() => Math.random() - 0.5);
+  const result = [...arr];
+  for(let i = result.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 function buildQuiz(){
   const selected = [];
   const categories = ["Problem Solving","SQL","Git","Testing"];
 
-  // 1 Problem Solving, 1 SQL, 4 Git, 2 Testing
   for(const c of categories){
-    const pool = shuffle(questionBank.filter(x => x.cat === c));
-    const n = c === "Git" ? 4 : 1;
-    if(c === "Testing") selected.push(...pool.slice(0,2));
-    else selected.push(...pool.slice(0,n));
+    const pool = shuffle(questionBank.filter(x => x.cat === c && x.level === document.getElementById('difficulty').value));
+    selected.push(...pool.slice(0, 2));
   }
 
   // Mezclar orden de las preguntas sin cambiar la distribución.
@@ -141,6 +157,11 @@ function buildQuiz(){
 }
 
 function submitQuiz(){
+  if (!window.currentQuiz || window.finished) return;
+  window.finished = true;
+  clearInterval(timerInterval);
+  document.querySelectorAll('#quiz input').forEach(input => input.disabled = true);
+  document.querySelector('#quizActions button').disabled = true;
   let score = 0;
   let answered = 0;
   const details = [];
@@ -169,18 +190,35 @@ function submitQuiz(){
 }
 
 let seconds = 30 * 60;
-const timerInterval = setInterval(() => {
-  seconds--;
-  const m = Math.floor(seconds / 60).toString().padStart(2,"0");
-  const s = (seconds % 60).toString().padStart(2,"0");
-  document.getElementById("timer").textContent = `${m}:${s}`;
-  if(seconds <= 0){
-    clearInterval(timerInterval);
-    submitQuiz();
-  }
-},1000);
-
-buildQuiz();
+let timerInterval;
+function startQuiz(){
+  window.finished = false;
+  seconds = 30 * 60;
+  document.getElementById('timer').textContent = '30:00';
+  document.getElementById('setup').hidden = true;
+  document.getElementById('quizActions').hidden = false;
+  document.querySelector('#quizActions button').disabled = false;
+  document.getElementById('result').style.display = 'none';
+  buildQuiz();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    seconds--;
+    const m = Math.floor(seconds / 60).toString().padStart(2,'0');
+    const s = (seconds % 60).toString().padStart(2,'0');
+    document.getElementById('timer').textContent = m + ':' + s;
+    if(seconds <= 0) submitQuiz();
+  }, 1000);
+}
+function resetQuiz(){
+  clearInterval(timerInterval);
+  window.currentQuiz = null;
+  document.getElementById('quiz').innerHTML = '';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('quizActions').hidden = true;
+  document.getElementById('setup').hidden = false;
+  document.getElementById('timer').textContent = '30:00';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
 </script>
 </body>
 </html>
