@@ -28,6 +28,11 @@
   .ok { color:var(--ok); } .bad { color:var(--bad); }
   .feedback { margin-top:12px; padding:12px; border-radius:8px; background:#f8f9fb; }
   .timer { font-weight:700; }
+  textarea { display:block; width:100%; min-height:95px; padding:12px; border:1px solid var(--border); border-radius:8px; font:15px/1.5 monospace; resize:vertical; }
+  .exercise-info { background:#f4f6fb; padding:12px; border-radius:8px; line-height:1.5; }
+  .run { margin-top:10px; font-size:14px; }
+  .output { white-space:pre-wrap; overflow-wrap:anywhere; font:13px/1.5 monospace; }
+  button:disabled { opacity:.6; cursor:not-allowed; }
   .setup { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin:20px 0; }
   .setup label { border:0; padding:0; cursor:default; font-weight:600; }
   select { width:100%; max-width:320px; padding:12px; border:1px solid var(--border); border-radius:8px; font:inherit; background:white; }
@@ -61,7 +66,7 @@
   <div class="setup" id="setup">
     <label for="difficulty">Dificultad</label>
     <select id="difficulty"><option value="facil">Fácil</option><option value="medio">Medio</option><option value="dificil">Difícil</option></select>
-    <p>El temporizador de práctica es de 30 minutos y no se puede pausar. Las preguntas son de práctica y no provienen de la prueba oficial.</p><div class="actions"><button type="button" onclick="startQuiz()">Comenzar simulacro</button></div>
+    <p>El temporizador de práctica es de 30 minutos y no se puede pausar. Las preguntas son de práctica y no provienen de la prueba oficial. SQL se ejecuta en SQLite con datos de ejemplo; Git se compara con comandos admitidos, sin ejecutarlos. Una respuesta equivalente de Git podría requerir revisión manual.</p><div class="actions"><button type="button" onclick="startQuiz()">Comenzar simulacro</button></div>
   </div>
   <div id="quiz"></div>
 
@@ -73,6 +78,8 @@
   <div id="result" class="result"></div>
 </div>
 
+<script src="vendor/sql-wasm.js"></script>
+<script src="practice.js"></script>
 <script>
 const questionBank = [
   // Problem Solving
@@ -124,77 +131,85 @@ function shuffle(arr){
   return result;
 }
 
+questionBank.forEach((item,i) => item.id='mc'+i);
+const extraMC = [
+ ['facil','Problem Solving','¿Cuál es la suma de los elementos de [1, 2, 3, 4]?',['10','9','6','12'],0,'1 + 2 + 3 + 4 = 10.'],
+ ['facil','Problem Solving','¿Cuántos valores son mayores que 5 en [2, 6, 8, 1]?',['2','1','3','4'],0,'Solo 6 y 8 son mayores que 5.'],
+ ['facil','Problem Solving','¿Qué devuelve el mayor valor entre 8, 3 y 12?',['12','8','3','23'],0,'12 es el mayor.'],
+ ['facil','Problem Solving','¿Qué resultado produce invertir la cadena "sol"?',['los','sol','ols','slo'],0,'Al invertir los caracteres se obtiene los.'],
+ ['medio','Problem Solving','¿Cuál es el costo de dos bucles anidados de n iteraciones cada uno?',['O(n²)','O(n)','O(log n)','O(1)'],0,'Se realizan n × n iteraciones.'],
+ ['medio','Problem Solving','¿Qué estructura usa el principio último en entrar, primero en salir?',['Pila','Cola','Conjunto','Tabla'],0,'La pila sigue LIFO.'],
+ ['medio','Problem Solving','¿Qué método es adecuado para contar ocurrencias por valor en una lista?',['Mapa de frecuencias','Búsqueda binaria sin ordenar','Pila sin memoria','Solo ordenar descendente'],0,'Un mapa acumula un contador para cada valor.'],
+ ['medio','Problem Solving','¿Qué debe comprobarse antes de acceder al primer elemento de una lista?',['Que no esté vacía','Que tenga exactamente diez elementos','Que contenga solo números pares','Que esté invertida'],0,'Una lista vacía no tiene primer elemento.'],
+ ['dificil','Problem Solving','¿Qué técnica evita recalcular subproblemas ya resueltos?',['Memoización','Fuerza bruta sin memoria','Búsqueda lineal repetida','Barajado'],0,'La memoización guarda resultados intermedios.'],
+ ['dificil','Problem Solving','¿Qué representa O(n log n) para un algoritmo de ordenación habitual?',['Su complejidad temporal','El número de variables globales','Un protocolo de red','La cantidad de archivos'],0,'Es una cota de crecimiento temporal.'],
+ ['dificil','Problem Solving','Para hallar el camino más corto en un grafo sin pesos, ¿qué recorrido es apropiado?',['BFS','DFS sin control de distancia','Recorrido aleatorio','Ordenación por nombre'],0,'BFS explora por niveles de distancia.'],
+ ['dificil','Problem Solving','Si se usa una tabla hash, ¿qué ocurre en una colisión?',['Dos claves comparten posición hash','Dos claves siempre son iguales','Se borra toda la tabla','La búsqueda siempre falla'],0,'Una colisión se maneja según la implementación de la tabla.'],
+ ['facil','Testing','¿Qué se comprueba en un caso de prueba?',['Resultado esperado frente al obtenido','Solo el nombre del desarrollador','Únicamente la documentación','El precio del servidor'],0,'Un caso verifica un comportamiento esperado.'],
+ ['facil','Testing','Una edad válida va de 18 a 65. ¿Qué par verifica ambos límites válidos?',['18 y 65','20 y 60','0 y 100','17 y 66'],0,'18 y 65 son los límites incluidos.'],
+ ['facil','Testing','¿Qué prueba se ejecuta tras una corrección para verificar que el fallo no regrese?',['Regresión','Solo carga','Solo instalación','Solo exploración'],0,'Una prueba de regresión protege frente al retorno del fallo.'],
+ ['facil','Testing','¿Qué es un caso negativo?',['Una entrada inválida o un fallo esperado','Una prueba que siempre falla','Una prueba sin aserciones','Un número necesariamente negativo'],0,'Comprueba cómo se maneja una situación inválida.'],
+ ['medio','Testing','Si un campo acepta 1 a 10 inclusive, ¿cuál es una entrada justo fuera del límite superior?',['11','10','9','1'],0,'11 está inmediatamente por encima de 10.'],
+ ['medio','Testing','¿Qué prueba comprueba el flujo completo de compra desde la interfaz hasta el resultado?',['Extremo a extremo','Unitaria aislada','Solo formato','Análisis de sintaxis'],0,'Una prueba extremo a extremo cubre un flujo completo.'],
+ ['medio','Testing','¿Qué es un stub?',['Una dependencia simulada que devuelve respuestas controladas','Un entorno de producción','Una rama remota','Un compilador'],0,'Un stub proporciona respuestas predefinidas en una prueba.'],
+ ['medio','Testing','¿Qué conviene hacer con datos creados durante una prueba de integración?',['Aislarlos o limpiarlos','Compartirlos sin control','Publicarlos','Ignorarlos siempre'],0,'El aislamiento evita interferencias entre pruebas.'],
+ ['dificil','Testing','¿Qué es un falso positivo en una prueba de detección de defectos?',['Informar un defecto que no existe','No detectar un defecto real','Encontrar un defecto real','Una prueba siempre rápida'],0,'Un falso positivo señala incorrectamente un defecto.'],
+ ['dificil','Testing','¿Qué protege mejor contra mutaciones de estado entre pruebas?',['Preparar y limpiar datos de forma aislada','Compartir datos mutables entre todas','Depender del orden de ejecución','Usar la base de producción'],0,'El aislamiento evita dependencia del orden y estado residual.'],
+ ['dificil','Testing','¿Qué mide la cobertura de ramas?',['Qué resultados de decisión se ejecutaron','Cuántos usuarios acceden','El tiempo de despliegue','La cantidad de commits'],0,'Mide la ejecución de las ramas posibles de las decisiones.'],
+ ['dificil','Testing','¿Por qué una cobertura del 100% no garantiza ausencia de errores?',['Ejecutar código no asegura buenas aserciones ni todos los casos','La cobertura mide únicamente memoria','El compilador elimina las pruebas','Los errores no afectan ramas'],0,'La cobertura no demuestra que las aserciones sean suficientes.']
+];
+extraMC.forEach(([level,cat,q,o,a,e],i)=>questionBank.push({id:'extra'+i,level,cat,q,o,a,e}));
 function buildQuiz(){
-  const selected = [];
-  const categories = ["Problem Solving","SQL","Git","Testing"];
-
-  for(const c of categories){
-    const pool = shuffle(questionBank.filter(x => x.cat === c && x.level === document.getElementById('difficulty').value));
-    const count = c === "Git" ? 4 : c === "Testing" ? 2 : 1;
-    selected.push(...pool.slice(0, count));
-  }
-
-  // Mezclar orden de las preguntas sin cambiar la distribución.
-  const finalQuestions = shuffle(selected);
-  window.currentQuiz = finalQuestions;
-
-  const container = document.getElementById("quiz");
-  container.innerHTML = "";
-
-  finalQuestions.forEach((item,i) => {
-    const div = document.createElement("div");
-    div.className = "question";
-    div.innerHTML = `
-      <div class="qhead">Pregunta ${i+1} · ${item.cat}</div>
-      <div class="qtext">${item.q}</div>
-      ${shuffle(item.o.map((text,index)=>({text,index}))).map(opt => `
-        <label>
-          <input type="radio" name="q${i}" value="${opt.index}">
-          ${opt.text}
-        </label>
-      `).join("")}
-    `;
-    container.appendChild(div);
-  });
+ const level=document.getElementById('difficulty').value;
+ const categories=['Problem Solving','SQL','Git','Testing'];
+ const selected=[];
+ for(const c of categories){
+  const pool=(c==='SQL'||c==='Git'?practiceQuestions:questionBank).filter(x=>x.cat===c && x.level===level);
+  const count=c==='Git'?4:c==='Testing'?2:1;
+  selected.push(...chooseQuestions(pool,count,level+':'+c));
+ }
+ window.currentQuiz=shuffle(selected);
+ const container=document.getElementById('quiz');container.innerHTML='';
+ currentQuiz.forEach((item,i)=>{
+  const div=document.createElement('div'); div.className='question';
+  let body='';
+  if(item.type==='sql') body=`<div class="exercise-info"><strong>SQLite · Datos de práctica</strong><br>empleados(id, nombre, departamento, salario, activo)<br>departamentos(nombre, ciudad)<br>Datos empleados: Ana / Ventas / 3000 / 1; Luis / IT / 4500 / 1; Marta / Ventas / 4000 / 0; Pedro / IT / 5000 / 1; Sara / RRHH / 3500 / 1; Elena / Ventas / NULL / 1. Sus id van del 1 al 6, en ese orden.<br>Departamentos: Ventas / Bogotá; IT / Medellín; RRHH / Cali; Legal / Bogotá.<br>activo: 1 = sí, 0 = no. La comparación no exige orden de filas.</div><label for="answer${i}">Escribe una consulta SELECT:</label><textarea id="answer${i}" spellcheck="false" placeholder="SELECT ..."></textarea><button class="secondary run" type="button" onclick="runSql(${i})">Ejecutar consulta</button><pre class="output" id="output${i}" aria-live="polite"></pre>`;
+  else if(item.type==='git') body=`<label for="answer${i}">Escribe el comando:</label><textarea id="answer${i}" spellcheck="false" placeholder="git ..."></textarea>`;
+  else body=shuffle(item.o.map((text,index)=>({text,index}))).map(opt=>`<label><input type="radio" name="q${i}" value="${opt.index}">${escapeHtml(opt.text)}</label>`).join('');
+  div.innerHTML=`<div class="qhead">Pregunta ${i+1} · ${escapeHtml(item.cat)}</div><div class="qtext">${escapeHtml(item.q)}</div>`+body;
+  container.appendChild(div);
+ });
 }
-
-function submitQuiz(){
-  if (!window.currentQuiz || window.finished) return;
-  window.finished = true;
-  clearInterval(timerInterval);
-  document.querySelectorAll('#quiz input').forEach(input => input.disabled = true);
-  document.querySelector('#quizActions button').disabled = true;
-  let score = 0;
-  let answered = 0;
-  const details = [];
-
-  currentQuiz.forEach((item,i) => {
-    const checked = document.querySelector(`input[name="q${i}"]:checked`);
-    if(checked) {
-      answered++;
-      const correct = Number(checked.value) === item.a;
-      if(correct) score++;
-      details.push(`<div class="feedback ${correct ? "ok":"bad"}"><b>Pregunta ${i+1}:</b> ${correct ? "Correcta" : "Incorrecta"} — ${item.e}</div>`);
-    } else {
-      details.push(`<div class="feedback bad"><b>Pregunta ${i+1}:</b> Sin responder — ${item.e}</div>`);
-    }
-  });
-
-  const pct = Math.round(score / currentQuiz.length * 100);
-  document.getElementById("result").style.display = "block";
-  document.getElementById("result").innerHTML = `
-    <div class="score">${score}/${currentQuiz.length} (${pct}%)</div>
-    <div>Respondidas: ${answered}/${currentQuiz.length}</div>
-    <hr>
-    ${details.join("")}
-  `;
-  window.scrollTo({top:document.body.scrollHeight, behavior:"smooth"});
+async function submitQuiz(){
+ if(!window.currentQuiz||window.finished||window.grading)return;
+ window.grading=true;const submit=document.querySelector('#quizActions button');submit.disabled=true;submit.textContent='Calificando…';
+ let score=0,answered=0;const details=[];
+ try{
+  for(let i=0;i<currentQuiz.length;i++){
+   const item=currentQuiz[i];let value,correct=false,message=item.e;
+   if(item.type){
+    value=document.getElementById('answer'+i).value.trim();
+    if(value && item.type==='git')correct=item.answers.some(a=>normalizedGit(a)===normalizedGit(value));
+    if(value && item.type==='sql'){const evaluation=await evaluateSql(value,item);correct=evaluation.correct;message=evaluation.message+' '+item.e}
+   } else {const checked=document.querySelector(`input[name="q${i}"]:checked`);value=checked?checked.value:'';if(value!=='')correct=Number(value)===item.a}
+   if(value!=='')answered++;if(correct)score++;
+   const label=value===''?'Sin responder':correct?'Correcta':'Incorrecta';
+   details.push(`<div class="feedback ${correct?'ok':'bad'}"><b>Pregunta ${i+1}:</b> ${label} — ${escapeHtml(message)}</div>`);
+  }
+ }catch(err){window.grading=false;submit.disabled=false;submit.textContent='Finalizar y calificar';alert('No se pudo cargar SQLite para calificar. Comprueba la conexión e inténtalo de nuevo.');return}
+ window.finished=true;window.grading=false;clearInterval(timerInterval);
+ document.querySelectorAll('#quiz input, #quiz textarea, #quiz button').forEach(input=>input.disabled=true);
+ submit.textContent='Finalizar y calificar';
+ const pct=Math.round(score/currentQuiz.length*100), result=document.getElementById('result');result.style.display='block';
+ result.innerHTML=`<div class="score">${score}/${currentQuiz.length} (${pct}%)</div><div>Respondidas: ${answered}/${currentQuiz.length}</div><p>SQL se compara con resultados de ejemplo y Git con comandos admitidos; una solución equivalente puede necesitar revisión manual.</p><hr>${details.join('')}`;
+ window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
 }
 
 let seconds = 30 * 60;
 let timerInterval;
 function startQuiz(){
   window.finished = false;
+  window.grading = false;
   seconds = 30 * 60;
   document.getElementById('timer').textContent = '30:00';
   document.getElementById('setup').hidden = true;
@@ -203,8 +218,9 @@ function startQuiz(){
   document.getElementById('result').style.display = 'none';
   buildQuiz();
   clearInterval(timerInterval);
+  const deadline = Date.now() + 30 * 60 * 1000;
   timerInterval = setInterval(() => {
-    seconds--;
+    seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
     const m = Math.floor(seconds / 60).toString().padStart(2,'0');
     const s = (seconds % 60).toString().padStart(2,'0');
     document.getElementById('timer').textContent = m + ':' + s;
