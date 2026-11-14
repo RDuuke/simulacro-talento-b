@@ -89,10 +89,19 @@ async function evaluateSql(answer,item){
     return {correct,message:correct?'Resultado correcto para los datos de práctica.':'El resultado no coincide con el esperado para los datos de práctica.',output:actual[0]};
   } catch(err){return {correct:false,message:'Error SQL: '+err.message}} finally {db.close()}
 }
+function renderTable(columns,rows){
+ const head=columns.map(c=>'<th scope="col">'+escapeHtml(c)+'</th>').join('');
+ const content=rows.length?rows.map(row=>'<tr>'+row.map(v=>'<td>'+escapeHtml(v===null?'NULL':v)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+columns.length+'">Sin filas</td></tr>';
+ return '<div class="table-wrap"><table><thead><tr>'+head+'</tr></thead><tbody>'+content+'</tbody></table></div>';
+}
+function sampleTables(){
+ return '<div class="table-title">empleados</div>'+renderTable(['id','nombre','departamento','salario','activo'],[[1,'Ana','Ventas',3000,1],[2,'Luis','IT',4500,1],[3,'Marta','Ventas',4000,0],[4,'Pedro','IT',5000,1],[5,'Sara','RRHH',3500,1],[6,'Elena','Ventas',null,1]])+
+ '<div class="table-title">departamentos</div>'+renderTable(['nombre','ciudad'],[['Ventas','Bogotá'],['IT','Medellín'],['RRHH','Cali'],['Legal','Bogotá']]);
+}
 async function runSql(i){
  const item=window.currentQuiz[i]; const out=document.getElementById('output'+i); const value=document.getElementById('answer'+i).value;
  out.textContent='Ejecutando…';
- try {const result=await evaluateSql(value,item);out.textContent=result.message+(result.output?'\nColumnas: '+result.output.columns.join(' | ')+'\n'+result.output.values.map(r=>r.map(v=>v===null?'NULL':v).join(' | ')).join('\n'):'')}
+ try {const result=await evaluateSql(value,item);out.innerHTML='<p>'+escapeHtml(result.message)+'</p>'+(result.output?'<div class="table-title">Resultado de tu consulta ('+result.output.values.length+' filas)</div>'+renderTable(result.output.columns,result.output.values):'')}
  catch(e){out.textContent='No se pudo cargar SQLite. Comprueba la conexión y vuelve a intentarlo.'}
 }
 function chooseQuestions(pool,count,key){
