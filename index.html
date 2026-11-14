@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulacro Talento B - Backend</title>
+<style>
+  :root { --bg:#f5f7fb; --card:#fff; --text:#172033; --muted:#667085; --accent:#3483fa; --border:#dfe4ea; --ok:#16883e; --bad:#d92d20; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,Arial,sans-serif; background:var(--bg); color:var(--text); }
+  .container { max-width:900px; margin:0 auto; padding:32px 20px 60px; }
+  .header { margin-bottom:24px; }
+  h1 { margin:0 0 8px; font-size:30px; }
+  .subtitle { color:var(--muted); }
+  .stats { display:flex; gap:10px; flex-wrap:wrap; margin:20px 0; }
+  .pill { background:#eaf2ff; color:#2458a6; padding:8px 12px; border-radius:999px; font-size:14px; }
+  .question { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px; margin:16px 0; box-shadow:0 2px 8px rgba(0,0,0,.03); }
+  .qhead { color:var(--muted); font-size:14px; margin-bottom:12px; }
+  .qtext { font-size:18px; line-height:1.5; margin-bottom:18px; }
+  label { display:block; border:1px solid var(--border); border-radius:10px; padding:13px 14px; margin:9px 0; cursor:pointer; transition:.15s; }
+  label:hover { border-color:var(--accent); background:#f7faff; }
+  input { margin-right:10px; }
+  button { border:0; border-radius:10px; padding:13px 20px; font-size:16px; cursor:pointer; background:var(--accent); color:white; }
+  button.secondary { background:#e9edf3; color:#263244; margin-left:8px; }
+  .actions { margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; }
+  .result { display:none; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px; margin-top:20px; }
+  .score { font-size:28px; font-weight:700; margin-bottom:8px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  .feedback { margin-top:12px; padding:12px; border-radius:8px; background:#f8f9fb; }
+  .timer { font-weight:700; }
+  .question, .result { min-width:0; overflow-wrap:anywhere; }
+  label { line-height:1.5; overflow-wrap:anywhere; }
+  .actions button { max-width:100%; }
+  @media(max-width:600px){
+    h1{font-size:24px}
+    .qtext{font-size:16px}
+    .container{padding:22px 12px 40px}
+    .question,.result{padding:16px}
+    .actions{flex-direction:column}
+    .actions button{width:100%}
+    button.secondary{margin-left:0}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Simulacro Talento B — Backend</h1>
+    <div class="subtitle">Práctica individual. Cada recarga genera un conjunto diferente de preguntas.</div>
+    <div class="stats">
+      <span class="pill">8 preguntas</span>
+      <span class="pill">Problem Solving · SQL · Git · Testing</span>
+      <span class="pill">Tiempo: <span id="timer" class="timer">30:00</span></span>
+    </div>
+  </div>
+
+  <div id="quiz"></div>
+
+  <div class="actions">
+    <button onclick="submitQuiz()">Finalizar y calificar</button>
+    <button class="secondary" onclick="location.reload()">Nuevo simulacro</button>
+  </div>
+
+  <div id="result" class="result"></div>
+</div>
+
+<script>
+const questionBank = [
+  // Problem Solving
+  {cat:"Problem Solving", q:"Dado el arreglo [2, 7, 1, 8, 3], ¿cuál es la suma de los valores mayores que 3?", o:["10","15","18","20"], a:1, e:"7 + 8 = 15."},
+  {cat:"Problem Solving", q:"¿Cuál es el resultado de recorrer [4, 2, 9, 1] y conservar solo los números pares?", o:["[4, 2]","[2, 1]","[4, 9]","[9, 1]"], a:0, e:"4 y 2 son los únicos números pares."},
+  {cat:"Problem Solving", q:"Una función recorre una lista de n elementos una sola vez. ¿Cuál es su complejidad temporal habitual?", o:["O(1)","O(log n)","O(n)","O(n²)"], a:2, e:"Una sola pasada por n elementos es O(n)."},
+  {cat:"Problem Solving", q:"Si una variable empieza en 5 y en cada iteración se multiplica por 2 tres veces, ¿cuál es su valor final?", o:["20","30","40","80"], a:2, e:"5 × 2 × 2 × 2 = 40."},
+
+  // SQL
+  {cat:"SQL", q:"¿Qué cláusula se utiliza para filtrar grupos después de aplicar una función de agregación como COUNT o AVG?", o:["WHERE","HAVING","ORDER BY","FROM"], a:1, e:"HAVING filtra resultados agrupados después de la agregación."},
+  {cat:"SQL", q:"¿Qué JOIN devuelve las filas de la tabla izquierda aunque no tengan coincidencia en la tabla derecha?", o:["INNER JOIN","RIGHT JOIN","LEFT JOIN","CROSS JOIN"], a:2, e:"LEFT JOIN conserva todas las filas de la tabla izquierda."},
+  {cat:"SQL", q:"¿Qué consulta cuenta empleados por departamento?", o:[
+    "SELECT departamento_id, COUNT(*) FROM empleados GROUP BY departamento_id",
+    "SELECT departamento_id, COUNT(*) FROM empleados ORDER BY departamento_id",
+    "SELECT COUNT(departamento_id) FROM empleados WHERE departamento_id",
+    "SELECT departamento_id FROM empleados COUNT(*)"
+  ], a:0, e:"GROUP BY departamento_id permite contar las filas de cada departamento."},
+  {cat:"SQL", q:"¿Qué función devuelve el salario promedio?", o:["SUM(salario)","AVG(salario)","COUNT(salario)","MAX(salario)"], a:1, e:"AVG calcula el promedio aritmético."},
+
+  // Git
+  {cat:"Git", q:"¿Qué comando crea una nueva rama y cambia inmediatamente a ella en versiones modernas de Git?", o:["git branch nueva","git switch -c nueva","git merge nueva","git tag nueva"], a:1, e:"git switch -c crea la rama y cambia a ella."},
+  {cat:"Git", q:"¿Qué comando permite guardar temporalmente cambios locales sin hacer commit?", o:["git stash","git fetch","git tag","git log"], a:0, e:"git stash aparta temporalmente cambios del working tree."},
+  {cat:"Git", q:"¿Qué comando descarga información del remoto sin integrar automáticamente esos cambios en tu rama?", o:["git pull","git fetch","git merge","git push"], a:1, e:"git fetch actualiza las referencias remotas sin hacer la integración."},
+  {cat:"Git", q:"Después de resolver manualmente un conflicto de merge, ¿qué paso se utiliza para marcar el archivo como resuelto?", o:["git add archivo","git clone archivo","git tag archivo","git init archivo"], a:0, e:"git add registra que el archivo en conflicto ya fue resuelto."},
+  {cat:"Git", q:"¿Qué operación se utiliza normalmente para integrar los cambios de una rama en otra creando un merge commit cuando corresponde?", o:["git merge","git stash","git fetch","git status"], a:0, e:"git merge integra el historial de otra rama en la rama actual."},
+  {cat:"Git", q:"¿Qué comando publica tus commits locales en un repositorio remoto?", o:["git pull","git push","git fetch","git diff"], a:1, e:"git push envía los commits locales al repositorio remoto."},
+  {cat:"Git", q:"¿Qué operación puede reescribir la base de una rama reaplicando sus commits sobre otra rama?", o:["git rebase","git status","git clone","git log"], a:0, e:"git rebase reaplica commits sobre una nueva base."},
+  {cat:"Git", q:"¿Qué comando permite ver el estado de archivos modificados, staged y sin seguimiento?", o:["git status","git show","git remote","git tag"], a:0, e:"git status muestra el estado actual del working tree y staging area."},
+
+  // Testing
+  {cat:"Testing", q:"Quieres probar una función aislada sin acceder a una base de datos real. ¿Qué tipo de prueba es la más adecuada?", o:["Prueba unitaria","Prueba de carga","Prueba de recuperación","Prueba de aceptación"], a:0, e:"Las pruebas unitarias validan unidades pequeñas y pueden aislar dependencias."},
+  {cat:"Testing", q:"Una función acepta valores entre 1 y 100 inclusive. ¿Cuál conjunto prueba mejor los valores límite?", o:["25, 50, 75","1, 50, 100","0, 1, 2, 99, 100, 101","10, 20, 30, 40"], a:2, e:"Se prueban los límites y valores inmediatamente fuera y dentro de ellos."},
+  {cat:"Testing", q:"¿Qué técnica divide las entradas en grupos que deberían comportarse de forma equivalente?", o:["Partición de equivalencia","Prueba de carga","Prueba de humo","Prueba de regresión"], a:0, e:"La partición de equivalencia divide el dominio en clases representativas."},
+  {cat:"Testing", q:"¿Cuál es el propósito principal de un mock en una prueba?", o:["Simular una dependencia para controlar su comportamiento","Aumentar la velocidad del servidor","Crear una base de datos de producción","Reemplazar todos los tests"], a:0, e:"Un mock permite simular y controlar una dependencia durante la prueba."}
+];
+
+function shuffle(arr){
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+function buildQuiz(){
+  const selected = [];
+  const categories = ["Problem Solving","SQL","Git","Testing"];
+
+  // 1 Problem Solving, 1 SQL, 4 Git, 2 Testing
+  for(const c of categories){
+    const pool = shuffle(questionBank.filter(x => x.cat === c));
+    const n = c === "Git" ? 4 : 1;
+    if(c === "Testing") selected.push(...pool.slice(0,2));
+    else selected.push(...pool.slice(0,n));
+  }
+
+  // Mezclar orden de las preguntas sin cambiar la distribución.
+  const finalQuestions = shuffle(selected);
+  window.currentQuiz = finalQuestions;
+
+  const container = document.getElementById("quiz");
+  container.innerHTML = "";
+
+  finalQuestions.forEach((item,i) => {
+    const div = document.createElement("div");
+    div.className = "question";
+    div.innerHTML = `
+      <div class="qhead">Pregunta ${i+1} · ${item.cat}</div>
+      <div class="qtext">${item.q}</div>
+      ${shuffle(item.o.map((text,index)=>({text,index}))).map(opt => `
+        <label>
+          <input type="radio" name="q${i}" value="${opt.index}">
+          ${opt.text}
+        </label>
+      `).join("")}
+    `;
+    container.appendChild(div);
+  });
+}
+
+function submitQuiz(){
+  let score = 0;
+  let answered = 0;
+  const details = [];
+
+  currentQuiz.forEach((item,i) => {
+    const checked = document.querySelector(`input[name="q${i}"]:checked`);
+    if(checked) {
+      answered++;
+      const correct = Number(checked.value) === item.a;
+      if(correct) score++;
+      details.push(`<div class="feedback ${correct ? "ok":"bad"}"><b>Pregunta ${i+1}:</b> ${correct ? "Correcta" : "Incorrecta"} — ${item.e}</div>`);
+    } else {
+      details.push(`<div class="feedback bad"><b>Pregunta ${i+1}:</b> Sin responder — ${item.e}</div>`);
+    }
+  });
+
+  const pct = Math.round(score / currentQuiz.length * 100);
+  document.getElementById("result").style.display = "block";
+  document.getElementById("result").innerHTML = `
+    <div class="score">${score}/${currentQuiz.length} (${pct}%)</div>
+    <div>Respondidas: ${answered}/${currentQuiz.length}</div>
+    <hr>
+    ${details.join("")}
+  `;
+  window.scrollTo({top:document.body.scrollHeight, behavior:"smooth"});
+}
+
+let seconds = 30 * 60;
+const timerInterval = setInterval(() => {
+  seconds--;
+  const m = Math.floor(seconds / 60).toString().padStart(2,"0");
+  const s = (seconds % 60).toString().padStart(2,"0");
+  document.getElementById("timer").textContent = `${m}:${s}`;
+  if(seconds <= 0){
+    clearInterval(timerInterval);
+    submitQuiz();
+  }
+},1000);
+
+buildQuiz();
+</script>
+</body>
+</html>
